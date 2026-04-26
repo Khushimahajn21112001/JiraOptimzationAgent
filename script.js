@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectKeySelect = document.getElementById('projectKey');
     const issueTypeGroup = document.getElementById('issueTypeGroup');
     const productGroup = document.getElementById('productGroup');
+    const sprintGroup = document.getElementById('sprintGroup');
     const projectBadge = document.getElementById('projectBadge');
 
     function updateFormForProject() {
@@ -24,12 +25,36 @@ document.addEventListener('DOMContentLoaded', () => {
         projectBadge.textContent = `Project: ${project}`;
         if (project === 'DEVOP') {
             productGroup.classList.remove('hidden');
+            sprintGroup.classList.add('hidden');
         } else {
             productGroup.classList.add('hidden');
+            sprintGroup.classList.remove('hidden');
         }
     }
     projectKeySelect.addEventListener('change', updateFormForProject);
     updateFormForProject();
+
+    // ---- Fetch Sprints ----
+    async function loadSprints() {
+        const sprintSelect = document.getElementById('sprint');
+        try {
+            const response = await fetch(`${API_BASE_URL}/sprints/GRA`);
+            if (response.ok) {
+                const data = await response.json();
+                sprintSelect.innerHTML = '<option value="" selected>Select a sprint (Optional)</option>';
+                data.sprints.forEach(sprint => {
+                    const opt = document.createElement('option');
+                    opt.value = sprint.id;
+                    opt.textContent = `${sprint.name} (${sprint.state})`;
+                    sprintSelect.appendChild(opt);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load sprints:', error);
+            sprintSelect.innerHTML = '<option value="" selected>Failed to load sprints</option>';
+        }
+    }
+    loadSprints();
 
     // ---- Tab Switching ----
     navItems.forEach(item => {

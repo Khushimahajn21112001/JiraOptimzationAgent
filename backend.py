@@ -7,6 +7,8 @@ import os
 import re
 import io
 import pandas as pd
+import requests
+from requests.auth import HTTPBasicAuth
 
 from jira import JIRA
 from dotenv import load_dotenv
@@ -148,6 +150,66 @@ async def get_field_options(issue_type: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/sprints/{project_key}")
+async def get_sprints(project_key: str):
+    """Fetch active and future sprints for a project using Jira Agile API."""
+    if not jira_client:
+        raise HTTPException(status_code=500, detail="Jira client not configured.")
+    try:
+        auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+        headers = {"Accept": "application/json"}
+        
+        boards_url = f"{JIRA_SERVER}/rest/agile/1.0/board"
+        boards_response = requests.get(
+            boards_url,
+            headers=headers,
+            auth=auth,
+            params={
+                "projectKeyOrId": project_key,
+                "type": "scrum"
+            }
+        )
+        boards_response.raise_for_status()
+        boards = boards_response.json().get("values", [])
+        
+        sprint_values = []
+        for board in boards:
+            board_id = board["id"]
+            start_at = 0
+            max_results = 50
+            while True:
+                sprint_url = f"{JIRA_SERVER}/rest/agile/1.0/board/{board_id}/sprint"
+                sprint_response = requests.get(
+                    sprint_url,
+                    headers=headers,
+                    auth=auth,
+                    params={
+                        "startAt": start_at,
+                        "maxResults": max_results,
+                        "state": "active,future" # we only want active/future for ticket creation
+                    }
+                )
+                sprint_response.raise_for_status()
+                data = sprint_response.json()
+                
+                for sprint in data.get("values", []):
+                    sprint_values.append({
+                        "id": sprint.get("id"),
+                        "name": sprint.get("name"),
+                        "state": sprint.get("state"),
+                        "board": board.get("name")
+                    })
+                
+                if data.get("isLast", True):
+                    break
+                start_at += max_results
+                
+        return {"status": "success", "sprints": sprint_values}
+    except Exception as e:
+        print(f"Error fetching sprints: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 # --- Pydantic Models ---
 class TicketCreateRequest(BaseModel):
@@ -180,6 +242,7 @@ async def create_ticket(
     summary: str = Form(...),
     description: str = Form(...),
     product: str = Form(None),
+    sprint: str = Form(None),
     attachment: Optional[UploadFile] = File(None)
 ):
     """Create a Jira ticket. Handles both GRA and DEVOP projects with optional attachment."""
@@ -250,6 +313,13 @@ async def create_ticket(
                 "customfield_10115": find_option_object(os_options, endUserOS, "End-User OS"),
                 "customfield_10156": find_option_object(db_options, databaseType, "Database Type"),
             }
+            
+            if sprint:
+                try:
+                    # Jira Sprint custom field typically takes the sprint ID as an integer
+                    issue_dict["customfield_10020"] = int(sprint)
+                except ValueError:
+                    print(f"Invalid sprint ID: {sprint}")
 
             print("GRA Payload:", issue_dict)
             new_issue = jira_client.create_issue(fields=issue_dict)
