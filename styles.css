@@ -230,7 +230,7 @@ body {
 
 .move-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 24px;
     align-items: start;
 }
@@ -811,6 +811,18 @@ textarea {
     font-size: 16px;
 }
 .clear-file-btn:hover { color: var(--error); }
+
+.dashboard-table th, .dashboard-table td {
+    padding: 14px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+}
+.dashboard-table tbody tr {
+    transition: var(--transition);
+}
+.dashboard-table tbody tr:hover {
+    background-color: rgba(255,255,255,0.02);
+}
 
 /* Bulk Results */
 .bulk-results-header {

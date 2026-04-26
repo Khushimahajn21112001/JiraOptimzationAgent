@@ -26,6 +26,14 @@
                     <i class="ph ph-arrows-left-right"></i>
                     Move Ticket
                 </button>
+                <button class="nav-item" data-tab="create-sprint">
+                    <i class="ph ph-calendar-plus"></i>
+                    Create Sprint
+                </button>
+                <button class="nav-item" data-tab="reopen-report">
+                    <i class="ph ph-chart-bar"></i>
+                    Reopen Report
+                </button>
             </nav>
             <div class="spacer"></div>
             <div class="user-profile">
@@ -246,8 +254,178 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TAB 3: Create Sprint -->
+            <div class="tab-content" id="create-sprint" style="display: none;">
+                <div class="card form-card glass-panel" style="max-width: 800px; margin: 0 auto;">
+                    <div class="card-header">
+                        <h3>Create New Sprint</h3>
+                        <p>Create a sprint and optionally map tickets to it.</p>
+                    </div>
+                    <form id="createSprintForm" class="dashboard-form">
+                        <div class="form-group">
+                            <label for="sprintName">Sprint Name</label>
+                            <div class="input-icon-wrapper">
+                                <i class="ph ph-calendar-plus"></i>
+                                <input type="text" id="sprintName" name="sprintName" placeholder="e.g. Sprint 24" required>
+                            </div>
+                        </div>
+                        <div class="form-row" style="display: flex; gap: 15px;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="startDate">Start Date</label>
+                                <div class="input-icon-wrapper">
+                                    <i class="ph ph-calendar"></i>
+                                    <input type="date" id="startDate" name="startDate" required>
+                                </div>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label for="endDate">End Date</label>
+                                <div class="input-icon-wrapper">
+                                    <i class="ph ph-calendar-check"></i>
+                                    <input type="date" id="endDate" name="endDate" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="sprintGoal">Goal (Optional)</label>
+                            <div class="input-icon-wrapper">
+                                <i class="ph ph-target"></i>
+                                <input type="text" id="sprintGoal" name="goal" placeholder="e.g. Complete UI overhaul">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Map Tickets to Sprint (Optional)</label>
+                            <div class="mode-toggle" style="margin-bottom: 10px;">
+                                <button type="button" class="mode-btn sprint-mode-btn active" data-mode="none">
+                                    <i class="ph ph-x-circle"></i> None
+                                </button>
+                                <button type="button" class="mode-btn sprint-mode-btn" data-mode="manual">
+                                    <i class="ph ph-keyboard"></i> Manual
+                                </button>
+                                <button type="button" class="mode-btn sprint-mode-btn" data-mode="upload">
+                                    <i class="ph ph-file-xls"></i> Upload Excel
+                                </button>
+                            </div>
+                            
+                            <div id="sprintManualGroup" class="hidden">
+                                <div class="input-icon-wrapper">
+                                    <i class="ph ph-list-numbers"></i>
+                                    <input type="text" id="sprintIssues" name="issues" placeholder="Comma separated IDs e.g. GRA-123, GRA-124">
+                                </div>
+                            </div>
+
+                            <div id="sprintUploadGroup" class="file-upload-area hidden">
+                                <i class="ph ph-cloud-arrow-up"></i>
+                                <p>Drag & drop or click to upload</p>
+                                <input type="file" id="sprintFile" name="file" accept=".xlsx,.xls,.csv" hidden>
+                                <div class="file-selected hidden" id="sprintFileSelectedInfo">
+                                    <i class="ph ph-file-xls"></i>
+                                    <span id="sprintSelectedFileName">file.xlsx</span>
+                                    <button type="button" id="sprintClearFileBtn" class="clear-file-btn"><i class="ph ph-x"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="btn-create-sprint">
+                                <span>Create Sprint</span>
+                                <i class="ph ph-rocket-launch"></i>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="createSprintResultBox" class="result-box hidden" style="margin-top: 20px;">
+                        <div class="result-icon success-icon">
+                            <i class="ph-fill ph-check-circle"></i>
+                        </div>
+                        <div class="result-details">
+                            <h4 id="sprintResultTitle">Sprint Created Successfully</h4>
+                            <p id="sprintResultMessage">Sprint mapped to tickets.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: Reopen Report -->
+            <div class="tab-content" id="reopen-report" style="display: none; width: 100%; max-width: 100%;">
+                <div class="card glass-panel">
+                    <div class="card-header">
+                        <h3><i class="ph ph-chart-bar"></i> Reopen Report</h3>
+                        <p>View issue reopening statistics by Ticket ID or Sprint.</p>
+                    </div>
+                    
+                    <form id="reopenReportForm" class="dashboard-form" style="margin-bottom: 20px;">
+                        <div class="form-row" style="display: flex; gap: 20px; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label for="reportTicketIds">Enter Ticket IDs (comma separated)</label>
+                                <input type="text" id="reportTicketIds" placeholder="e.g. GRA-123, GRA-456">
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: center; height: 45px; color: var(--text-muted); font-weight: bold;">OR</div>
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label for="reportSprintSelect">Select Sprint</label>
+                                <div class="select-wrapper">
+                                    <select id="reportSprintSelect">
+                                        <option value="" selected>Select a sprint...</option>
+                                    </select>
+                                    <i class="ph ph-caret-down"></i>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <button type="submit" class="btn btn-primary" id="btn-generate-report">
+                                    <span>Fetch Stats</span>
+                                    <i class="ph ph-arrow-circle-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    
+                    <div id="reportExportWrapper" class="hidden" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; gap: 15px;">
+                        <div style="position: relative; width: 300px;">
+                            <i class="ph ph-magnifying-glass" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px;"></i>
+                            <input type="text" id="reopenSearchInput" placeholder="Global search (ID, dev, name)..." style="padding: 10px 16px 10px 44px; width: 100%; background-color: var(--bg-surface-elevated); border: 1px solid var(--border); border-radius: var(--border-radius-sm); color: var(--text-main); font-size: 14px;">
+                        </div>
+                        
+                        <button id="btn-export-report" class="btn" style="background: var(--bg-surface-elevated); border: 1px solid var(--border); color: var(--text-main); display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition);">
+                            <i class="ph ph-download-simple" style="font-size: 16px;"></i>
+                            Export CSV
+                        </button>
+                    </div>
+                    
+                    <div id="reportResultsBox" class="hidden" style="overflow-x: auto; margin-top: 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        <table class="dashboard-table" style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background-color: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border);">
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">Ticket ID</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">Summary</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">Developer</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">Total Reopened</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">1st Reopened By</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">1st Reopened On</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">2nd Reopened By</th>
+                                    <th style="padding: 12px 16px; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 14px;">2nd Reopened On</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportTableBody" style="font-size: 13px;">
+                                <!-- Rows dynamically inserted -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </main>
         
+        <!-- Modal for all reopens -->
+        <div id="reopensModal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); align-items: center; justify-content: center; z-index: 2000; display: flex;">
+            <div class="card glass-panel" style="width: 600px; max-height: 80vh; overflow-y: auto; position: relative; padding: 24px;">
+                <button id="closeModalBtn" style="position: absolute; top: 15px; right: 15px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px;"><i class="ph ph-x"></i></button>
+                <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;"><i class="ph ph-clock-counter-clockwise" style="color: var(--primary);"></i> Reopen History for <span id="modalTicketId" style="color: var(--primary);"></span></h3>
+                <div id="modalEventsList" style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- populated dynamically -->
+                </div>
+            </div>
+        </div>
+
         <div id="toastContainer" class="toast-container"></div>
     </div>
     

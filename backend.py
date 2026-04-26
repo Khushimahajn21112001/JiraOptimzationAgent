@@ -531,6 +531,288 @@ async def move_tickets_bulk(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/create-sprint")
+async def create_sprint_endpoint(
+    projectKey: str = Form("GRA"),
+    sprintName: str = Form(...),
+    startDate: str = Form(...),
+    endDate: str = Form(...),
+    goal: str = Form(""),
+    issues: str = Form(""),
+    file: Optional[UploadFile] = File(None)
+):
+    try:
+        if not jira_client:
+            raise Exception("Jira client not configured.")
+            
+        auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        
+        # 1. Get Board
+        board_url = f"{JIRA_SERVER}/rest/agile/1.0/board"
+        board_res = requests.get(board_url, headers=headers, auth=auth, params={"projectKeyOrId": projectKey, "type": "scrum"})
+        board_res.raise_for_status()
+        boards = board_res.json().get("values", [])
+        if not boards:
+            raise Exception(f"No scrum board found for project {projectKey}")
+        board_id = boards[0]["id"]
+        
+        # 2. Check existing sprint
+        start_at = 0
+        sprint_exists = False
+        while True:
+            s_url = f"{JIRA_SERVER}/rest/agile/1.0/board/{board_id}/sprint"
+            s_res = requests.get(s_url, headers=headers, auth=auth, params={"startAt": start_at})
+            s_data = s_res.json()
+            for sprint in s_data.get("values", []):
+                if sprint.get("name", "").lower() == sprintName.lower():
+                    sprint_exists = True
+                    break
+            if sprint_exists or s_data.get("isLast", True):
+                break
+            start_at += 50
+            
+        if sprint_exists:
+            raise Exception(f"Sprint '{sprintName}' already exists!")
+            
+        # 3. Create sprint
+        def format_date(dt_str, is_end=False):
+            if not dt_str: return dt_str
+            # Add time and timezone if only date is provided
+            if len(dt_str) == 10:
+                time_suffix = "T18:00:00.000+0530" if is_end else "T09:00:00.000+0530"
+                return dt_str + time_suffix
+            if len(dt_str) == 16:
+                return dt_str + ":00.000+0530"
+            return dt_str
+            
+        payload = {
+            "name": sprintName,
+            "originBoardId": board_id,
+            "startDate": format_date(startDate, False),
+            "endDate": format_date(endDate, True),
+            "goal": goal
+        }
+        create_res = requests.post(create_url := f"{JIRA_SERVER}/rest/agile/1.0/sprint", headers=headers, auth=auth, json=payload)
+        
+        if not create_res.ok:
+            raise Exception(f"Failed to create sprint: {create_res.text}")
+            
+        sprint_id = create_res.json().get("id")
+        
+        # 4. Gather issues
+        issue_keys = []
+        if issues:
+            issue_keys.extend([i.strip().upper() for i in issues.split(",") if i.strip()])
+            
+        if file:
+            contents = await file.read()
+            filename = file.filename.lower()
+            if filename.endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(contents))
+            elif filename.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(io.BytesIO(contents))
+            else:
+                raise Exception("Unsupported file format for tickets.")
+                
+            ticket_col = find_ticket_column(df)
+            if ticket_col:
+                for raw_ticket in df[ticket_col].dropna():
+                    if is_valid_issue_key(raw_ticket):
+                        issue_keys.append(str(raw_ticket).strip().upper())
+                        
+        issue_keys = list(set(issue_keys))
+        
+        # 5. Add issues to sprint
+        mapped_count = 0
+        if issue_keys:
+            add_url = f"{JIRA_SERVER}/rest/agile/1.0/sprint/{sprint_id}/issue"
+            add_payload = {"issues": issue_keys}
+            add_res = requests.post(add_url, headers=headers, auth=auth, json=add_payload)
+            if not add_res.ok:
+                print(f"Error mapping issues: {add_res.text}")
+            else:
+                mapped_count = len(issue_keys)
+                
+        return {
+            "status": "success", 
+            "sprintId": sprint_id, 
+            "sprintName": sprintName,
+            "mappedIssuesCount": mapped_count,
+            "issues": issue_keys
+        }
+    except Exception as e:
+        print(f"Sprint creation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sprint-issues/{sprint_id}")
+async def get_sprint_issues(sprint_id: int):
+    """Fetch issues for a specific sprint."""
+    if not jira_client:
+        raise HTTPException(status_code=500, detail="Jira client not configured.")
+    try:
+        auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+        headers = {"Accept": "application/json"}
+        
+        url = f"{JIRA_SERVER}/rest/agile/1.0/sprint/{sprint_id}/issue"
+        params = {
+            "fields": "summary,description,status",
+            "maxResults": 100
+        }
+        res = requests.get(url, headers=headers, auth=auth, params=params)
+        res.raise_for_status()
+        
+        issues = []
+        data = res.json()
+        for item in data.get("issues", []):
+            fields = item.get("fields", {})
+            issues.append({
+                "key": item.get("key"),
+                "summary": fields.get("summary", ""),
+                "description": fields.get("description", ""),
+                "status": fields.get("status", {}).get("name", "")
+            })
+            
+        return {"status": "success", "issues": issues}
+    except Exception as e:
+        print(f"Error fetching sprint issues: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/reopen-report")
+async def get_reopen_report(ticket_ids: str = None, sprint_id: str = None):
+    if not jira_client:
+        raise HTTPException(status_code=500, detail="Jira client not configured.")
+    
+    issues = []
+    auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+    headers = {"Accept": "application/json"}
+    
+    try:
+        if ticket_ids:
+            ids = [id.strip() for id in ticket_ids.split(",") if id.strip()]
+            for tid in ids:
+                url = f"{JIRA_SERVER}/rest/api/3/issue/{tid}?expand=changelog"
+                res = requests.get(url, headers=headers, auth=auth)
+                if res.ok:
+                    issues.append(res.json())
+        elif sprint_id:
+            start_at = 0
+            max_results = 50
+            total = 1
+            
+            while start_at < total:
+                sprint_url = f"{JIRA_SERVER}/rest/agile/1.0/sprint/{sprint_id}/issue?startAt={start_at}&maxResults={max_results}"
+                res = requests.get(sprint_url, headers=headers, auth=auth)
+                if not res.ok:
+                    break
+                sprint_data = res.json()
+                total = sprint_data.get("total", 0)
+                
+                for issue_item in sprint_data.get("issues", []):
+                    url = f"{JIRA_SERVER}/rest/api/3/issue/{issue_item['key']}?expand=changelog"
+                    i_res = requests.get(url, headers=headers, auth=auth)
+                    if i_res.ok:
+                        issues.append(i_res.json())
+                
+                start_at += max_results
+                if max_results == 0: # Safeguard
+                    break
+        else:
+            raise HTTPException(status_code=400, detail="Provide either ticket_ids or sprint_id")
+
+        report_rows = []
+        DEVELOPER_FIELD = "customfield_10110"
+        REOPEN_STATUS_NAMES = {"reopen"}
+        REOPEN_STATUS_IDS = {"10056", "10628"}
+
+        for issue in issues:
+            fields = issue.get("fields", {})
+            issue_type_name = str(fields.get("issuetype", {}).get("name", "")).lower()
+            is_subtask_bool = fields.get("issuetype", {}).get("subtask", False)
+            
+            if is_subtask_bool or "sub" in issue_type_name:
+                continue
+                
+            ticket_id = issue.get("key")
+            
+            dev = fields.get(DEVELOPER_FIELD)
+            developer_name = "-"
+            if dev:
+                if isinstance(dev, list):
+                    developer_name = ", ".join([d.get("displayName", str(d)) for d in dev])
+                elif isinstance(dev, dict):
+                    developer_name = dev.get("displayName", "-")
+                else:
+                    developer_name = str(dev)
+
+            reopen_events = []
+            changelog = issue.get("changelog", {})
+            histories = changelog.get("histories", [])
+
+            for history in histories:
+                author = history.get("author", {})
+                changed_by = author.get("displayName", "-")
+                changed_on = history.get("created", "-")
+
+                for item in history.get("items", []):
+                    field_name = item.get("field")
+                    if not field_name or str(field_name).lower() != "status":
+                        continue
+
+                    from_status = item.get("fromString", "")
+                    to_status = item.get("toString", "")
+                    to_status_id = item.get("to", "")
+
+                    to_status_name_clean = str(to_status).strip().lower()
+                    to_status_id_clean = str(to_status_id).strip()
+
+                    is_reopen = (to_status_name_clean in REOPEN_STATUS_NAMES) or (to_status_id_clean in REOPEN_STATUS_IDS)
+
+                    if is_reopen:
+                        reopen_events.append({
+                            "reopened_on": changed_on,
+                            "reopened_by": changed_by,
+                            "from_status": from_status,
+                            "to_status": to_status
+                        })
+
+            reopen_events.sort(key=lambda x: x["reopened_on"])
+            total_reopened_count = len(reopen_events)
+
+            first_reopened_by = "-"
+            first_reopened_on = "-"
+            second_reopened_on = "-"
+            second_reopened_by = "-"
+
+            if total_reopened_count >= 1:
+                first_reopened_by = reopen_events[0]["reopened_by"]
+                first_reopened_on = reopen_events[0]["reopened_on"][:10] if reopen_events[0]["reopened_on"] != "-" else "-"
+
+            if total_reopened_count >= 2:
+                second_reopened_by = reopen_events[1]["reopened_by"]
+                second_reopened_on = reopen_events[1]["reopened_on"][:10] if reopen_events[1]["reopened_on"] != "-" else "-"
+
+            report_rows.append({
+                "ticket_id": ticket_id,
+                "summary": fields.get("summary", "-"),
+                "developer_name": developer_name,
+                "total_reopen_count": total_reopened_count,
+                "first_reopened_by": first_reopened_by,
+                "first_reopened_on": first_reopened_on,
+                "second_reopened_by": second_reopened_by,
+                "second_reopened_on": second_reopened_on,
+                "all_reopen_events": reopen_events
+            })
+
+        return {"status": "success", "report": report_rows}
+
+    except Exception as e:
+        print(f"Error generating reopen report: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 if __name__ == "__main__":
     import uvicorn
     print("Starting Jira backend API on http://localhost:8000")
