@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Ops Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="styles.css?v=5">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo-container">
+                <i class="ph-fill ph-kanban"></i>
+                <h1>OpsDash</h1>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="create-ticket">
+                    <i class="ph ph-plus-circle"></i>
+                    Create Ticket
+                </button>
+                <button class="nav-item" data-tab="move-ticket">
+                    <i class="ph ph-arrows-left-right"></i>
+                    Move Ticket
+                </button>
+            </nav>
+            <div class="spacer"></div>
+            <div class="user-profile">
+                <div class="avatar">K</div>
+                <div class="user-details">
+                    <span class="user-name">Khushi Mahajan</span>
+                    <span class="user-role">Operations</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <h2>Workspace Overview</h2>
+                <div class="project-context">
+                    <span class="badge" id="projectBadge">Project: GRA</span>
+                    <span class="badge status-live"><span class="dot"></span> Connected to Jira</span>
+                </div>
+            </header>
+
+            <!-- TAB 1: Create Ticket -->
+            <div class="tab-content" id="create-ticket" style="display: block;">
+                <div class="card form-card glass-panel">
+                    <div class="card-header">
+                        <h3>Create New Issue</h3>
+                        <p>Fill out the details below to generate a new Jira ticket.</p>
+                    </div>
+                    <form id="createTicketForm" class="dashboard-form">
+                        <div class="form-group">
+                            <label for="projectKey">Project</label>
+                            <div class="select-wrapper">
+                                <select id="projectKey" name="projectKey" required>
+                                    <option value="GRA" selected>GRA</option>
+                                    <option value="DEVOP">DEVOP</option>
+                                </select>
+                                <i class="ph ph-caret-down"></i>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="issueTypeGroup">
+                            <label for="issueType">Issue Type</label>
+                            <div class="select-wrapper">
+                                <select id="issueType" name="issueType" required>
+                                    <option value="" disabled selected>Select an issue type...</option>
+                                    <option value="Task">Task</option>
+                                    <option value="Bug">Bug</option>
+                                    <option value="Story">Story</option>
+                                </select>
+                                <i class="ph ph-caret-down"></i>
+                            </div>
+                        </div>
+
+                        <div class="form-group hidden" id="productGroup">
+                            <label for="product">Product</label>
+                            <div class="select-wrapper">
+                                <select id="product" name="product">
+                                    <option value="MY Vault">MY Vault</option>
+                                    <option value="GRA">GRA</option>
+                                </select>
+                                <i class="ph ph-caret-down"></i>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="summary">Summary</label>
+                            <input type="text" id="summary" name="summary" placeholder="Brief description of the issue" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" name="description" rows="5" placeholder="Provide detailed information here..." required></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary" id="btn-create">
+                                <span>Create Ticket</span>
+                                <i class="ph ph-paper-plane-right"></i>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div id="createResultBox" class="result-box hidden">
+                        <div class="result-icon success-icon">
+                            <i class="ph-fill ph-check-circle"></i>
+                        </div>
+                        <div class="result-details">
+                            <h4>Ticket Created Successfully</h4>
+                            <p>Your ticket: <a id="newTicketLink" href="#" target="_blank" class="ticket-id-link">GRA-123</a></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Move Ticket -->
+            <div class="tab-content" id="move-ticket" style="display: none;">
+                <div class="move-layout">
+                    <!-- Left: Form -->
+                    <div class="card form-card glass-panel">
+                        <div class="card-header">
+                            <h3>Move Ticket Status</h3>
+                            <p>Move one ticket or bulk-move from an Excel/CSV file.</p>
+                        </div>
+                        <form id="moveTicketForm" class="dashboard-form" onsubmit="return false;">
+                            <div class="form-group">
+                                <label for="transition">Transition</label>
+                                <div class="select-wrapper">
+                                    <select id="transition" name="transition" required>
+                                        <option value="" disabled selected>Select a transition...</option>
+                                        <option value="Audit|QA Testing">Audit → QA Testing</option>
+                                        <option value="Functional Testing|Audit">Functional Testing → Audit</option>
+                                        <option value="Document Review|Closed">Document Review → Close</option>
+                                    </select>
+                                    <i class="ph ph-caret-down"></i>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Input Mode</label>
+                                <div class="mode-toggle">
+                                    <button type="button" class="mode-btn active" data-mode="single">
+                                        <i class="ph ph-ticket"></i> Single Ticket
+                                    </button>
+                                    <button type="button" class="mode-btn" data-mode="bulk">
+                                        <i class="ph ph-file-xls"></i> Upload Excel / CSV
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="singleTicketGroup">
+                                <label for="ticketNumber">Ticket Number</label>
+                                <div class="input-icon-wrapper">
+                                    <i class="ph ph-ticket"></i>
+                                    <input type="text" id="ticketNumber" name="ticketNumber" placeholder="e.g., GRA-123">
+                                </div>
+                            </div>
+
+                            <div class="form-group hidden" id="bulkUploadGroup">
+                                <label for="bulkFile">Upload File (.xlsx, .xls, .csv)</label>
+                                <div class="file-upload-area" id="fileDropArea">
+                                    <i class="ph ph-cloud-arrow-up"></i>
+                                    <p>Drag & drop file here or <span class="file-browse">browse</span></p>
+                                    <p class="file-hint">The file just needs an Issue Key column (e.g., GRA-123)</p>
+                                    <input type="file" id="bulkFile" accept=".xlsx,.xls,.csv" hidden>
+                                    <div class="file-selected hidden" id="fileSelectedInfo">
+                                        <i class="ph ph-file-xls"></i>
+                                        <span id="selectedFileName">file.xlsx</span>
+                                        <button type="button" id="clearFileBtn" class="clear-file-btn"><i class="ph ph-x"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-primary" id="btn-move">
+                                    <span>Move Ticket</span>
+                                    <i class="ph ph-fast-forward"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Right: Results Panel -->
+                    <div class="card results-panel glass-panel">
+                        <div class="card-header">
+                            <h3><i class="ph ph-list-checks"></i> Results</h3>
+                            <p>Move results will appear here.</p>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="resultsEmpty" class="results-empty">
+                            <i class="ph ph-clipboard-text"></i>
+                            <p>No results yet</p>
+                            <span>Select a transition and move tickets to see results here.</span>
+                        </div>
+
+                        <!-- Single Result -->
+                        <div id="moveResultBox" class="result-box hidden">
+                            <div class="result-icon success-icon">
+                                <i class="ph-fill ph-check-circle"></i>
+                            </div>
+                            <div class="result-details">
+                                <h4>Status Updated Successfully</h4>
+                                <p>Ticket <strong id="movedTicketId">GRA-123</strong> moved to <strong id="newStatusValue">QA Testing</strong>.</p>
+                            </div>
+                        </div>
+
+                        <!-- Bulk Results -->
+                        <div id="bulkResultsBox" class="hidden">
+                            <div class="bulk-results-header">
+                                <span id="bulkSummary" class="bulk-summary"></span>
+                            </div>
+                            <div class="bulk-results-list" id="bulkResultsList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+    
+    <script src="script.js?v=5"></script>
+</body>
+</html>
