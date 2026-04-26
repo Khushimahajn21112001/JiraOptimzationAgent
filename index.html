@@ -99,6 +99,20 @@
                             <textarea id="description" name="description" rows="5" placeholder="Provide detailed information here..." required></textarea>
                         </div>
 
+                        <div class="form-group">
+                            <label>Attachment (Optional)</label>
+                            <div class="file-upload-area attachment-area" id="createFileDropArea">
+                                <i class="ph ph-file-plus"></i>
+                                <p>Click or drag file to attach</p>
+                                <input type="file" id="createAttachment" name="attachment" hidden>
+                                <div class="file-selected hidden" id="createFileSelectedInfo">
+                                    <i class="ph ph-file"></i>
+                                    <span id="createSelectedFileName">file.png</span>
+                                    <button type="button" id="createClearFileBtn" class="clear-file-btn"><i class="ph ph-x"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary" id="btn-create">
                                 <span>Create Ticket</span>

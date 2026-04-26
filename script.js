@@ -109,30 +109,43 @@ document.addEventListener('DOMContentLoaded', () => {
         fileSelectedInfo.classList.remove('hidden');
     }
 
+    // ============ Create Ticket Attachment UI ============
+    const createFileInput = document.getElementById('createAttachment');
+    const createDropArea = document.getElementById('createFileDropArea');
+    const createFileSelectedInfo = document.getElementById('createFileSelectedInfo');
+    const createSelectedFileName = document.getElementById('createSelectedFileName');
+    const createClearFileBtn = document.getElementById('createClearFileBtn');
+
+    createDropArea.addEventListener('click', () => createFileInput.click());
+    createDropArea.addEventListener('dragover', (e) => { e.preventDefault(); createDropArea.classList.add('drag-over'); });
+    createDropArea.addEventListener('dragleave', () => createDropArea.classList.remove('drag-over'));
+    createDropArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        createDropArea.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            createFileInput.files = e.dataTransfer.files;
+            showCreateSelectedFile(e.dataTransfer.files[0].name);
+        }
+    });
+    createFileInput.addEventListener('change', () => {
+        if (createFileInput.files.length) showCreateSelectedFile(createFileInput.files[0].name);
+    });
+    createClearFileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        createFileInput.value = '';
+        createFileSelectedInfo.classList.add('hidden');
+    });
+
+    function showCreateSelectedFile(name) {
+        createSelectedFileName.textContent = name;
+        createFileSelectedInfo.classList.remove('hidden');
+    }
+
     // ============ Create Ticket ============
     createTicketForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = document.getElementById('btn-create');
         const formData = new FormData(createTicketForm);
-        const project = formData.get('projectKey');
-
-        let requestData;
-        if (project === 'DEVOP') {
-            requestData = {
-                projectKey: 'DEVOP',
-                summary: formData.get('summary'),
-                description: formData.get('description'),
-                product: formData.get('product'),
-                issueType: formData.get('issueType'),
-            };
-        } else {
-            requestData = {
-                projectKey: 'GRA',
-                issueType: formData.get('issueType'),
-                summary: formData.get('summary'),
-                description: formData.get('description'),
-            };
-        }
 
         btn.classList.add('loading'); btn.disabled = true;
         createResultBox.classList.add('hidden');
@@ -140,18 +153,28 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`${API_BASE_URL}/create-ticket`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestData)
+                body: formData // Send as multipart/form-data
             });
             if (!response.ok) {
                 const errData = await response.json().catch(() => null);
-                throw new Error(errData?.detail || `Server error ${response.status}`);
+                let message = "Unknown error occurred";
+                if (errData && errData.detail) {
+                    if (Array.isArray(errData.detail)) {
+                        message = errData.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ');
+                    } else {
+                        message = errData.detail;
+                    }
+                }
+                throw new Error(message);
             }
             const data = await response.json();
             newTicketLink.textContent = data.ticketId;
             newTicketLink.href = data.url;
             createResultBox.classList.remove('hidden');
             showToast(`Ticket ${data.ticketId} created!`, 'success');
+            // Reset attachment UI
+            createFileInput.value = '';
+            createFileSelectedInfo.classList.add('hidden');
         } catch (error) {
             console.error(error);
             showToast(`Failed: ${error.message}`, 'error');

@@ -683,10 +683,38 @@ textarea {
     .main-content { padding: 20px; }
 }
 
-/* Mode Toggle */
-.mode-toggle {
-    display: flex;
-    gap: 8px;
+.file-upload-area.attachment-area {
+    padding: 20px;
+    border-style: dashed;
+    border-width: 2px;
+    border-color: var(--border);
+    background-color: rgba(255, 255, 255, 0.02);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.file-upload-area.attachment-area:hover {
+    border-color: var(--primary);
+    background-color: rgba(99, 102, 241, 0.05);
+    transform: translateY(-2px);
+}
+
+.file-upload-area.attachment-area i {
+    font-size: 28px;
+    color: var(--primary);
+    margin-bottom: 8px;
+}
+
+.file-upload-area.attachment-area p {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.file-upload-area.attachment-area .file-selected {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background-color: rgba(99, 102, 241, 0.1);
+    border: 1px solid var(--primary);
 }
 
 .mode-btn {

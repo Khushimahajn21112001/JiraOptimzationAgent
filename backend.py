@@ -174,22 +174,41 @@ class TicketMoveRequest(BaseModel):
 
 
 @app.post("/create-ticket")
-async def create_ticket(request: TicketCreateRequest):
-    """Create a Jira ticket. Handles both GRA and DEVOP projects."""
+async def create_ticket(
+    projectKey: str = Form(...),
+    issueType: str = Form(None),
+    summary: str = Form(...),
+    description: str = Form(...),
+    product: str = Form(None),
+    attachment: Optional[UploadFile] = File(None)
+):
+    """Create a Jira ticket. Handles both GRA and DEVOP projects with optional attachment."""
     try:
         if not jira_client:
             raise Exception("Jira client not configured.")
 
-        if request.projectKey == "DEVOP":
+        # Default values for GRA
+        assignee = "Khushi Mahajan"
+        reporter = "Khushi Mahajan"
+        department = "Functional"
+        primaryClient = "Internal (ARCON)"
+        component = "all"
+        priority = "Low"
+        endUserOS = "Windows"
+        databaseType = "MySql & MSSql"
+
+        new_issue = None
+
+        if projectKey == "DEVOP":
             # ---- DEVOP Project: simple payload with hardcoded defaults ----
-            product_value = request.product or "GRA"
+            product_value = product or "GRA"
             print(f"Creating DEVOP Task: product={product_value}")
 
             issue_dict = {
                 "project": {"key": "DEVOP"},
                 "issuetype": {"name": "Task"},
-                "summary": request.summary,
-                "description": request.description,
+                "summary": summary,
+                "description": description,
                 "customfield_10220": {"value": product_value},
                 "customfield_10114": {"value": "Functional"},
                 "customfield_10230": [{"value": "QA"}],
@@ -201,18 +220,11 @@ async def create_ticket(request: TicketCreateRequest):
             new_issue = jira_client.create_issue(fields=issue_dict)
             print("Created DEVOP ticket:", new_issue.key)
 
-            return {
-                "status": "success",
-                "ticketId": new_issue.key,
-                "message": "DEVOP ticket created successfully",
-                "url": f"{JIRA_SERVER}/browse/{new_issue.key}"
-            }
-
         else:
             # ---- GRA Project: full payload with metadata resolution ----
-            print(f"Creating {request.issueType} in {request.projectKey}...")
+            print(f"Creating {issueType} in {projectKey}...")
 
-            fields = get_fields_meta(request.projectKey, request.issueType)
+            fields = get_fields_meta(projectKey, issueType)
 
             dept_options = get_allowed_values(fields, "customfield_10114")
             pc_options = get_allowed_values(fields, "customfield_10112")
@@ -221,34 +233,45 @@ async def create_ticket(request: TicketCreateRequest):
             component_options = get_allowed_values(fields, "components")
             priority_options = get_allowed_values(fields, "priority")
 
-            assignee_account_id = get_user_account_id(request.assignee)
-            reporter_account_id = get_user_account_id(request.reporter)
+            assignee_account_id = get_user_account_id(assignee)
+            reporter_account_id = get_user_account_id(reporter)
 
             issue_dict = {
-                "project": {"key": request.projectKey},
-                "issuetype": {"name": request.issueType},
-                "summary": request.summary,
-                "description": request.description,
+                "project": {"key": projectKey},
+                "issuetype": {"name": issueType},
+                "summary": summary,
+                "description": description,
                 "assignee": {"accountId": assignee_account_id},
                 "reporter": {"accountId": reporter_account_id},
-                "customfield_10114": find_option_object(dept_options, request.department, "Department Of Created By"),
-                "customfield_10112": find_option_object(pc_options, request.primaryClient, "Primary Client"),
-                "components": [find_component_object(component_options, request.component)],
-                "priority": find_option_object(priority_options, request.priority, "Priority") if priority_options else {"name": request.priority},
-                "customfield_10115": find_option_object(os_options, request.endUserOS, "End-User OS"),
-                "customfield_10156": find_option_object(db_options, request.databaseType, "Database Type"),
+                "customfield_10114": find_option_object(dept_options, department, "Department Of Created By"),
+                "customfield_10112": find_option_object(pc_options, primaryClient, "Primary Client"),
+                "components": [find_component_object(component_options, component)],
+                "priority": find_option_object(priority_options, priority, "Priority") if priority_options else {"name": priority},
+                "customfield_10115": find_option_object(os_options, endUserOS, "End-User OS"),
+                "customfield_10156": find_option_object(db_options, databaseType, "Database Type"),
             }
 
             print("GRA Payload:", issue_dict)
             new_issue = jira_client.create_issue(fields=issue_dict)
             print("Created GRA ticket:", new_issue.key)
 
-            return {
-                "status": "success",
-                "ticketId": new_issue.key,
-                "message": "Ticket created successfully",
-                "url": f"{JIRA_SERVER}/browse/{new_issue.key}"
-            }
+        # Handle Attachment
+        if new_issue and attachment:
+            print(f"Uploading attachment: {attachment.filename}")
+            # Read file content
+            file_content = await attachment.read()
+            # Wrap in bytes stream
+            file_stream = io.BytesIO(file_content)
+            # Add to Jira
+            jira_client.add_attachment(issue=new_issue, attachment=file_stream, filename=attachment.filename)
+            print("Attachment uploaded successfully.")
+
+        return {
+            "status": "success",
+            "ticketId": new_issue.key,
+            "message": "Ticket created successfully with attachment" if attachment else "Ticket created successfully",
+            "url": f"{JIRA_SERVER}/browse/{new_issue.key}"
+        }
     except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
